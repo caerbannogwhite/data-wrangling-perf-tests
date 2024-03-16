@@ -22,22 +22,29 @@
 rm(list = ls())
 library(tidyverse)
 
-example01 <- function(N, D) {
-  fever_threshold_C <- 37.5
+# Run and time the execution
+runner <- function(func, data, times = 2) {
+  records <- c()
+  for (i in 1:times) {
+    records <- c(records, system.time(func(data))["elapsed"])
+  }
 
-  conditions <- c(
-    "cond_a", "cond_b", "cond_c", "cond_d", "cond_e",
-    "cond_f", "cond_g", "cond_h", "cond_i", "cond_j"
+  list(
+    mean = mean(records),
+    sd = sd(records)
   )
+}
 
-  # Generate the data for the example 01
+# Generate the data for the example 01
+example01_data_gen <- function(N, D) {
   subj_num <- N
   days_num <- D
   rows_num <- subj_num * days_num
 
-  subjects <- str_c("SUBJ", sample(1:subj_num, subj_num, replace = FALSE))
+  # add padding 0s to the subjec id
+  subjects <- sprintf("SUBJ%07d", sample(1:subj_num, subj_num, replace = FALSE))
 
-  cond_values <- c(rep(0, 6), rep(1, 4), 2, 2, 3, rep(NA, 6))
+  cond_values <- c(rep(0, 7), rep(1, 5), 2, 2, 3, rep(NA, 6))
   fever_values <- c(36.1 + 0.3 * 0:20, NA)
 
   example01_data <- tibble(expand.grid(
@@ -59,6 +66,23 @@ example01 <- function(N, D) {
     )
 
   write_csv(example01_data, str_c("example01_data_", rows_num, ".csv"))
+}
+
+# Run the example
+example01_runner <- function(N, D) {
+  fever_threshold_C <- 37.5
+
+  conditions <- c(
+    "cond_a", "cond_b", "cond_c", "cond_d", "cond_e",
+    "cond_f", "cond_g", "cond_h", "cond_i", "cond_j"
+  )
+
+  # Generate the data for the example 01
+  subj_num <- N
+  days_num <- D
+  rows_num <- subj_num * days_num
+
+  example01_data <- read_csv(str_c("example01_data_", rows_num, ".csv"))
 
   # First implementation of the example in R
   example01_r_baseline <- function(tab) {
@@ -100,8 +124,8 @@ example01 <- function(N, D) {
         cond_h_strong = cond_h > 1,
         cond_i_strong = cond_i > 1,
         cond_j_strong = cond_j > 1,
-        temp_hight = !is.na(temp_C) & (temp_C >= fever_threshold_C),
-        temp_low = !is.na(temp_C) & (temp_C < fever_threshold_C),
+        temp_hight = temp_C >= fever_threshold_C,
+        temp_low = temp_C < fever_threshold_C,
       ) %>%
       mutate(
         strong_cond_num = sum(
@@ -143,8 +167,8 @@ example01 <- function(N, D) {
         cond_h_strong = cond_h > 1,
         cond_i_strong = cond_i > 1,
         cond_j_strong = cond_j > 1,
-        temp_hight = !is.na(temp_C) & (temp_C >= fever_threshold_C),
-        temp_low = !is.na(temp_C) & (temp_C < fever_threshold_C),
+        temp_hight = temp_C >= fever_threshold_C,
+        temp_low = temp_C < fever_threshold_C,
       ) %>%
       rowwise() %>%
       mutate(
@@ -197,20 +221,6 @@ example01 <- function(N, D) {
       )
   }
 
-
-  # Run the example, time the execution
-  run <- function(func, data, times = 5) {
-    records <- c()
-    for (i in 1:times) {
-      records <- c(records, system.time(func(data))["elapsed"])
-    }
-
-    list(
-      mean = mean(records),
-      sd = sd(records)
-    )
-  }
-
   # Check the results
   solution_baseline <- example01_r_baseline(example01_data)
   solution_improved <- example01_r_improved(example01_data)
@@ -223,47 +233,56 @@ example01 <- function(N, D) {
 
   solution_baseline %>%
     select(subj_id, day, classification) %>%
-    write_csv("example01_solution.csv")
+    write_csv(str_c("example01_solution_", rows_num, ".csv"))
 
   # Run the example
   list(
-    example01_r_baseline = run(example01_r_baseline, example01_data),
-    example01_r_improved = run(example01_r_improved, example01_data),
-    example01_r_take_2 = run(example01_r_take_2, example01_data),
-    example01_r_take_3 = run(example01_r_take_3, example01_data)
+    example01_r_baseline = runner(example01_r_baseline, example01_data),
+    example01_r_improved = runner(example01_r_improved, example01_data),
+    example01_r_take_2 = runner(example01_r_take_2, example01_data),
+    example01_r_take_3 = runner(example01_r_take_3, example01_data)
   )
 }
 
 Ns <- c(64, 128, 256, 512)
 Ds <- c(32, 32, 32, 32)
 
+map2(Ns, Ds, example01_data_gen)
 
-results <- map2(Ns, Ds, example01)
+results <- map2(Ns, Ds, example01_runner)
+
+avg_speedup_improved <- mean(map_dbl(results, ~ .x$example01_r_baseline$mean) /
+  map_dbl(results, ~ .x$example01_r_improved$mean))
+avg_speedup_take_2 <- mean(map_dbl(results, ~ .x$example01_r_baseline$mean) /
+  map_dbl(results, ~ .x$example01_r_take_2$mean))
+
+cat(sprintf("Average speedup improved: %6.2f%%", avg_speedup_improved), "\n")
+cat(sprintf("Average speedup take 2:   %6.2f%%", avg_speedup_take_2), "\n")
 
 ggplot2::ggplot(
   tibble(
     N = Ns,
     D = Ds,
-    example01_r_baseline = map_dbl(results, ~ .x$example01_r_baseline$mean),
-    example01_r_improved = map_dbl(results, ~ .x$example01_r_improved$mean),
-    example01_r_take_2 = map_dbl(results, ~ .x$example01_r_take_2$mean),
-    example01_r_take_3 = map_dbl(results, ~ .x$example01_r_take_3$mean)
+    baseline = map_dbl(results, ~ .x$example01_r_baseline$mean),
+    improved = map_dbl(results, ~ .x$example01_r_improved$mean),
+    take_2 = map_dbl(results, ~ .x$example01_r_take_2$mean),
+    take_3 = map_dbl(results, ~ .x$example01_r_take_3$mean)
   ) %>%
     pivot_longer(
       cols = -c(N, D),
       names_to = "implementation",
       values_to = "time"
     ),
-  aes(x = N, y = time, color = implementation)
+  aes(x = N * D, y = time, color = implementation)
 ) +
   geom_point() +
   geom_line() +
   labs(
-    title = "Example 01",
-    x = "Number of subjects",
+    title = "Example 01 - R",
+    x = "Number of records",
     y = "Time (s)",
     color = "Implementation"
   ) +
   theme_minimal()
-  
-  ggsave("example01.png", width = 6, height = 4, dpi = 300)
+
+ggsave("example01_r.png", width = 6, height = 4, dpi = 300)
