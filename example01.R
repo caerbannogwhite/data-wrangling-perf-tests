@@ -35,6 +35,145 @@ runner <- function(func, data, times = 2) {
   )
 }
 
+# First implementation of the example in R
+example01_r_baseline <- function(tab) {
+  tab %>%
+    rowwise() %>%
+    mutate(
+      strong_cond_num = sum(across(all_of(conditions), ~ .x > 1), na.rm = TRUE),
+      mild_cond_num = sum(across(all_of(conditions), ~ .x <= 1), na.rm = TRUE),
+    ) %>%
+    mutate(
+      strong_cond_num = strong_cond_num + (
+        !is.na(temp_C) & (temp_C >= fever_threshold_C)
+      ),
+      mild_cond_num = mild_cond_num + (
+        !is.na(temp_C) &
+          (temp_C < fever_threshold_C)
+      ),
+      classification = case_when(
+        strong_cond_num > 0 ~ as.character(strong_cond_num),
+        mild_cond_num >= 6 ~ "R",
+        TRUE ~ "M"
+      ),
+    ) %>%
+    ungroup()
+}
+
+# Second implementation
+example01_r_improved <- function(tab) {
+  tab %>%
+    rowwise() %>%
+    mutate(
+      cond_a_strong = cond_a > 1,
+      cond_b_strong = cond_b > 1,
+      cond_c_strong = cond_c > 1,
+      cond_d_strong = cond_d > 1,
+      cond_e_strong = cond_e > 1,
+      cond_f_strong = cond_f > 1,
+      cond_g_strong = cond_g > 1,
+      cond_h_strong = cond_h > 1,
+      cond_i_strong = cond_i > 1,
+      cond_j_strong = cond_j > 1,
+      temp_hight = temp_C >= fever_threshold_C,
+      temp_low = temp_C < fever_threshold_C,
+    ) %>%
+    mutate(
+      strong_cond_num = sum(
+        cond_a_strong, cond_b_strong, cond_c_strong, cond_d_strong,
+        cond_e_strong, cond_f_strong, cond_g_strong, cond_h_strong,
+        cond_i_strong, cond_j_strong,
+        temp_hight,
+        na.rm = TRUE
+      ),
+      mild_cond_num = sum(
+        !cond_a_strong, !cond_b_strong, !cond_c_strong, !cond_d_strong,
+        !cond_e_strong, !cond_f_strong, !cond_g_strong, !cond_h_strong,
+        !cond_i_strong, !cond_j_strong,
+        temp_low,
+        na.rm = TRUE
+      ),
+    ) %>%
+    mutate(
+      classification = case_when(
+        strong_cond_num > 0 ~ as.character(strong_cond_num),
+        mild_cond_num >= 6 ~ "R",
+        TRUE ~ "M"
+      ),
+    ) %>%
+    ungroup()
+}
+
+# Second implementation
+example01_r_take_2 <- function(tab) {
+  tab %>%
+    mutate(
+      cond_a_strong = cond_a > 1,
+      cond_b_strong = cond_b > 1,
+      cond_c_strong = cond_c > 1,
+      cond_d_strong = cond_d > 1,
+      cond_e_strong = cond_e > 1,
+      cond_f_strong = cond_f > 1,
+      cond_g_strong = cond_g > 1,
+      cond_h_strong = cond_h > 1,
+      cond_i_strong = cond_i > 1,
+      cond_j_strong = cond_j > 1,
+      temp_hight = temp_C >= fever_threshold_C,
+      temp_low = temp_C < fever_threshold_C,
+    ) %>%
+    rowwise() %>%
+    mutate(
+      strong_cond_num = sum(
+        cond_a_strong, cond_b_strong, cond_c_strong, cond_d_strong,
+        cond_e_strong, cond_f_strong, cond_g_strong, cond_h_strong,
+        cond_i_strong, cond_j_strong,
+        temp_hight,
+        na.rm = TRUE
+      ),
+      mild_cond_num = sum(
+        !cond_a_strong, !cond_b_strong, !cond_c_strong, !cond_d_strong,
+        !cond_e_strong, !cond_f_strong, !cond_g_strong, !cond_h_strong,
+        !cond_i_strong, !cond_j_strong,
+        temp_low,
+        na.rm = TRUE
+      ),
+    ) %>%
+    ungroup() %>%
+    mutate(
+      classification = case_when(
+        strong_cond_num > 0 ~ as.character(strong_cond_num),
+        mild_cond_num >= 6 ~ "R",
+        TRUE ~ "M"
+      ),
+    )
+}
+
+# Baseline but moving the rowwise() where it is needed
+example01_r_take_3 <- function(tab) {
+  tab %>%
+    rowwise() %>%
+    mutate(
+      strong_cond_num = sum(across(all_of(conditions), ~ .x > 1), na.rm = TRUE),
+      mild_cond_num = sum(across(all_of(conditions), ~ .x <= 1), na.rm = TRUE),
+    ) %>%
+    ungroup() %>%
+    mutate(
+      strong_cond_num = strong_cond_num + (
+        !is.na(temp_C) & (temp_C >= fever_threshold_C)
+      ),
+      mild_cond_num = mild_cond_num + (
+        !is.na(temp_C) &
+          (temp_C < fever_threshold_C)
+      ),
+      classification = case_when(
+        strong_cond_num > 0 ~ as.character(strong_cond_num),
+        mild_cond_num >= 6 ~ "R",
+        TRUE ~ "M"
+      ),
+    )
+}
+
+
 # Generate the data for the example 01
 example01_data_gen <- function(N, D) {
   subj_num <- N
@@ -84,143 +223,6 @@ example01_runner <- function(N, D) {
 
   example01_data <- read_csv(str_c("example01_data_", rows_num, ".csv"))
 
-  # First implementation of the example in R
-  example01_r_baseline <- function(tab) {
-    tab %>%
-      rowwise() %>%
-      mutate(
-        strong_cond_num = sum(across(all_of(conditions), ~ .x > 1), na.rm = TRUE),
-        mild_cond_num = sum(across(all_of(conditions), ~ .x <= 1), na.rm = TRUE),
-      ) %>%
-      mutate(
-        strong_cond_num = strong_cond_num + (
-          !is.na(temp_C) & (temp_C >= fever_threshold_C)
-        ),
-        mild_cond_num = mild_cond_num + (
-          !is.na(temp_C) &
-            (temp_C < fever_threshold_C)
-        ),
-        classification = case_when(
-          strong_cond_num > 0 ~ as.character(strong_cond_num),
-          mild_cond_num >= 6 ~ "R",
-          TRUE ~ "M"
-        ),
-      ) %>%
-      ungroup()
-  }
-
-  # Second implementation
-  example01_r_improved <- function(tab) {
-    tab %>%
-      rowwise() %>%
-      mutate(
-        cond_a_strong = cond_a > 1,
-        cond_b_strong = cond_b > 1,
-        cond_c_strong = cond_c > 1,
-        cond_d_strong = cond_d > 1,
-        cond_e_strong = cond_e > 1,
-        cond_f_strong = cond_f > 1,
-        cond_g_strong = cond_g > 1,
-        cond_h_strong = cond_h > 1,
-        cond_i_strong = cond_i > 1,
-        cond_j_strong = cond_j > 1,
-        temp_hight = temp_C >= fever_threshold_C,
-        temp_low = temp_C < fever_threshold_C,
-      ) %>%
-      mutate(
-        strong_cond_num = sum(
-          cond_a_strong, cond_b_strong, cond_c_strong, cond_d_strong,
-          cond_e_strong, cond_f_strong, cond_g_strong, cond_h_strong,
-          cond_i_strong, cond_j_strong,
-          temp_hight,
-          na.rm = TRUE
-        ),
-        mild_cond_num = sum(
-          !cond_a_strong, !cond_b_strong, !cond_c_strong, !cond_d_strong,
-          !cond_e_strong, !cond_f_strong, !cond_g_strong, !cond_h_strong,
-          !cond_i_strong, !cond_j_strong,
-          temp_low,
-          na.rm = TRUE
-        ),
-      ) %>%
-      mutate(
-        classification = case_when(
-          strong_cond_num > 0 ~ as.character(strong_cond_num),
-          mild_cond_num >= 6 ~ "R",
-          TRUE ~ "M"
-        ),
-      ) %>%
-      ungroup()
-  }
-
-  # Second implementation
-  example01_r_take_2 <- function(tab) {
-    tab %>%
-      mutate(
-        cond_a_strong = cond_a > 1,
-        cond_b_strong = cond_b > 1,
-        cond_c_strong = cond_c > 1,
-        cond_d_strong = cond_d > 1,
-        cond_e_strong = cond_e > 1,
-        cond_f_strong = cond_f > 1,
-        cond_g_strong = cond_g > 1,
-        cond_h_strong = cond_h > 1,
-        cond_i_strong = cond_i > 1,
-        cond_j_strong = cond_j > 1,
-        temp_hight = temp_C >= fever_threshold_C,
-        temp_low = temp_C < fever_threshold_C,
-      ) %>%
-      rowwise() %>%
-      mutate(
-        strong_cond_num = sum(
-          cond_a_strong, cond_b_strong, cond_c_strong, cond_d_strong,
-          cond_e_strong, cond_f_strong, cond_g_strong, cond_h_strong,
-          cond_i_strong, cond_j_strong,
-          temp_hight,
-          na.rm = TRUE
-        ),
-        mild_cond_num = sum(
-          !cond_a_strong, !cond_b_strong, !cond_c_strong, !cond_d_strong,
-          !cond_e_strong, !cond_f_strong, !cond_g_strong, !cond_h_strong,
-          !cond_i_strong, !cond_j_strong,
-          temp_low,
-          na.rm = TRUE
-        ),
-      ) %>%
-      ungroup() %>%
-      mutate(
-        classification = case_when(
-          strong_cond_num > 0 ~ as.character(strong_cond_num),
-          mild_cond_num >= 6 ~ "R",
-          TRUE ~ "M"
-        ),
-      )
-  }
-
-  example01_r_take_3 <- function(tab) {
-    tab %>%
-      rowwise() %>%
-      mutate(
-        strong_cond_num = sum(across(all_of(conditions), ~ .x > 1), na.rm = TRUE),
-        mild_cond_num = sum(across(all_of(conditions), ~ .x <= 1), na.rm = TRUE),
-      ) %>%
-      ungroup() %>%
-      mutate(
-        strong_cond_num = strong_cond_num + (
-          !is.na(temp_C) & (temp_C >= fever_threshold_C)
-        ),
-        mild_cond_num = mild_cond_num + (
-          !is.na(temp_C) &
-            (temp_C < fever_threshold_C)
-        ),
-        classification = case_when(
-          strong_cond_num > 0 ~ as.character(strong_cond_num),
-          mild_cond_num >= 6 ~ "R",
-          TRUE ~ "M"
-        ),
-      )
-  }
-
   # Check the results
   solution_baseline <- example01_r_baseline(example01_data)
   solution_improved <- example01_r_improved(example01_data)
@@ -256,8 +258,8 @@ avg_speedup_improved <- mean(map_dbl(results, ~ .x$example01_r_baseline$mean) /
 avg_speedup_take_2 <- mean(map_dbl(results, ~ .x$example01_r_baseline$mean) /
   map_dbl(results, ~ .x$example01_r_take_2$mean))
 
-cat(sprintf("Average speedup improved: %6.2f%%", avg_speedup_improved), "\n")
-cat(sprintf("Average speedup take 2:   %6.2f%%", avg_speedup_take_2), "\n")
+cat(sprintf("Average speedup improved: %6.2fx", avg_speedup_improved), "\n")
+cat(sprintf("Average speedup take 2:   %6.2fx", avg_speedup_take_2), "\n")
 
 ggplot2::ggplot(
   tibble(
